@@ -35,7 +35,10 @@ class vulkan_renderer {
 	bool check_instance_extension_support( std::vector<const char*>* extensions );
 	bool check_device_extension_support( VkPhysicalDevice physical_device);
 	bool check_device_suitable( VkPhysicalDevice physical_device );
+	
+	// Getter
 	QueueFamilyIndicies get_queue_family(VkPhysicalDevice physical_device);
+	SwapChainDetails get_swap_chain_details(VkPhysicalDevice physical_device);
 
 public:
 	vulkan_renderer();

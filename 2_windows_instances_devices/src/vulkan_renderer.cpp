@@ -241,8 +241,15 @@ bool vulkan_renderer::check_device_suitable(VkPhysicalDevice physical_device)
 	//vkGetPhysicalDeviceFeatures(physical_device, &physical_device_features);
 	bool extension_supported = check_device_extension_support(physical_device);
 
+	bool swap_chain_valid = false;
+	if (extension_supported)
+	{
+		SwapChainDetails swap_chain_details = get_swap_chain_details(physical_device);
+		swap_chain_valid = !swap_chain_details.present_modes.empty() && !swap_chain_details.surface_formats.empty();
+	}
+
 	QueueFamilyIndicies indicies = get_queue_family(physical_device);
-	return indicies.is_valid() && extension_supported;
+	return indicies.is_valid() && extension_supported && swap_chain_valid;
 }
 
 QueueFamilyIndicies vulkan_renderer::get_queue_family( VkPhysicalDevice physical_device )
@@ -281,4 +288,36 @@ QueueFamilyIndicies vulkan_renderer::get_queue_family( VkPhysicalDevice physical
 	}
 
 	return indicies;
+}
+
+SwapChainDetails vulkan_renderer::get_swap_chain_details(VkPhysicalDevice physical_device)
+{
+	SwapChainDetails swap_chain_details;
+
+	// Capabilities
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &swap_chain_details.surface_capabilities);
+
+	// Formats
+	uint32_t formats_count = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &formats_count, nullptr);
+	
+	if (formats_count != 0)
+	{
+		swap_chain_details.surface_formats.resize(formats_count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &formats_count, 
+			swap_chain_details.surface_formats.data());
+	}
+
+	// Present modes
+	uint32_t present_mode_count = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
+
+	if (present_mode_count != 0)
+	{
+		swap_chain_details.present_modes.resize(present_mode_count);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count,
+			swap_chain_details.present_modes.data());
+	}
+
+	return swap_chain_details;
 }
