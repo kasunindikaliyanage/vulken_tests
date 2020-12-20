@@ -39,6 +39,8 @@ int main()
 		glfwPollEvents();
 	}
 
+	renderer.cleanup();
+
 	//clean things up
 	glfwDestroyWindow(window);
 	glfwTerminate();

@@ -5,7 +5,7 @@
   <PropertyGroup />
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\externs;$(SolutionDir)..\externs\GLFW\include;C:\VulkanSDK\1.2.154.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\externs;$(SolutionDir)..\externs\GLFW\include;C:\VulkanSDK\1.2.154.1\Include;$(SolutionDir)common\headers;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)..\externs\GLFW\libs;C:\VulkanSDK\1.2.154.1\Lib32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
