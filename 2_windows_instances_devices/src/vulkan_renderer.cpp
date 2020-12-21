@@ -4,6 +4,7 @@ vulkan_renderer::vulkan_renderer()
 {
 }
 
+
 int vulkan_renderer::init(GLFWwindow* new_window)
 {
 	window = new_window;
@@ -14,6 +15,7 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 		create_surface();
 		get_physical_device();
 		create_logical_device();
+		create_swap_chain();
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -24,12 +26,20 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 	return EXIT_SUCCESS;
 }
 
+
 void vulkan_renderer::cleanup()
 {
+	for (auto image: swap_chain_images)
+	{
+		vkDestroyImageView(main_device.logical_device, image.image_view, nullptr);
+	}
+
+	vkDestroySwapchainKHR(main_device.logical_device, swap_chain, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyDevice(main_device.logical_device, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
+
 
 void vulkan_renderer::create_instance()
 {
@@ -82,6 +92,7 @@ void vulkan_renderer::create_instance()
 
 }
 
+
 void vulkan_renderer::create_logical_device()
 {
 	QueueFamilyIndicies indicies = get_queue_family(main_device.physical_device);
@@ -130,6 +141,7 @@ void vulkan_renderer::create_logical_device()
 	vkGetDeviceQueue(main_device.logical_device, indicies.presentation_family, 0, &presentation_queue);
 }
 
+
 void vulkan_renderer::create_surface()
 {
 	VkResult result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
@@ -142,6 +154,96 @@ void vulkan_renderer::create_surface()
 	{
 		printf("Surface creation is  a success \n");
 	}
+}
+
+
+void vulkan_renderer::create_swap_chain()
+{
+	SwapChainDetails details = get_swap_chain_details(main_device.physical_device);
+
+	// Choose best format
+	VkSurfaceFormatKHR surface_format = choose_best_surface_format(details.surface_formats);
+
+	// Choose best presentation mode
+	VkPresentModeKHR present_mode = choose_best_present_mode(details.present_modes);
+	
+	// Choose best swap chain image resolution
+	VkExtent2D extent = choose_swap_extent(details.surface_capabilities);
+
+	uint32_t image_count = details.surface_capabilities.minImageCount + 1;
+
+	if ( details.surface_capabilities.maxImageCount > 0 
+		&& image_count > details.surface_capabilities.maxImageCount)
+	{
+		image_count = details.surface_capabilities.maxImageCount;
+	}
+
+	VkSwapchainCreateInfoKHR swap_chain_create_info = {};
+	swap_chain_create_info.sType			=	VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swap_chain_create_info.surface			=	surface;
+	swap_chain_create_info.imageFormat		=	surface_format.format;
+	swap_chain_create_info.presentMode		=	present_mode;
+	swap_chain_create_info.imageExtent		=	extent;
+	swap_chain_create_info.minImageCount	=	image_count;
+	swap_chain_create_info.imageArrayLayers =	1 ;
+	swap_chain_create_info.imageUsage		=	VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swap_chain_create_info.preTransform		=	details.surface_capabilities.currentTransform;
+	swap_chain_create_info.compositeAlpha	=	VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swap_chain_create_info.clipped			=	VK_TRUE;
+
+	QueueFamilyIndicies indices = get_queue_family( main_device.physical_device );
+
+	if (indices.graphics_family != indices.presentation_family)
+	{
+		uint32_t queue_family_indices[] = {
+			(uint32_t)indices.graphics_family,
+			(uint32_t)indices.presentation_family
+		};
+
+		swap_chain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swap_chain_create_info.queueFamilyIndexCount = 2;
+		swap_chain_create_info.pQueueFamilyIndices = queue_family_indices;
+
+	}
+	else
+	{
+		swap_chain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE ;
+		swap_chain_create_info.queueFamilyIndexCount = 0 ;
+		swap_chain_create_info.pQueueFamilyIndices = nullptr;
+	}
+
+	swap_chain_create_info.oldSwapchain = VK_NULL_HANDLE;
+
+	//create the swap_chain
+	VkResult result =  vkCreateSwapchainKHR(main_device.logical_device, &swap_chain_create_info, nullptr, &swap_chain);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(" Error : Faild to create swap chain \n");
+	}
+	else
+	{
+		printf("Swap chain creation sucessful \n");
+	}
+
+	swap_chain_image_format = surface_format.format;
+	swap_chain_extent = extent;
+
+	uint32_t swap_chain_image_count;
+	vkGetSwapchainImagesKHR(main_device.logical_device, swap_chain, &swap_chain_image_count, nullptr);
+	std::vector<VkImage> images(swap_chain_image_count);
+	vkGetSwapchainImagesKHR(main_device.logical_device, swap_chain, &swap_chain_image_count, images.data());
+
+	for ( VkImage image : images)
+	{
+		SwapChainImage swap_chain_image = {};
+		swap_chain_image.image = image;
+		swap_chain_image.image_view = create_image_view(image, swap_chain_image_format, VK_IMAGE_ASPECT_COLOR_BIT);
+		//Create image view
+
+		swap_chain_images.push_back(swap_chain_image);
+	}
+
 }
 
 void vulkan_renderer::get_physical_device()
@@ -166,6 +268,7 @@ void vulkan_renderer::get_physical_device()
 		}
 	}
 }
+
 
 bool vulkan_renderer::check_instance_extension_support(std::vector<const char*>* check_extensions)
 {
@@ -197,6 +300,7 @@ bool vulkan_renderer::check_instance_extension_support(std::vector<const char*>*
 
 	return true;
 }
+
 
 bool vulkan_renderer::check_device_extension_support(VkPhysicalDevice physical_device)
 {
@@ -232,6 +336,7 @@ bool vulkan_renderer::check_device_extension_support(VkPhysicalDevice physical_d
 	return true;
 }
 
+
 bool vulkan_renderer::check_device_suitable(VkPhysicalDevice physical_device)
 {
 	//VkPhysicalDeviceProperties physical_device_props;
@@ -251,6 +356,7 @@ bool vulkan_renderer::check_device_suitable(VkPhysicalDevice physical_device)
 	QueueFamilyIndicies indicies = get_queue_family(physical_device);
 	return indicies.is_valid() && extension_supported && swap_chain_valid;
 }
+
 
 QueueFamilyIndicies vulkan_renderer::get_queue_family( VkPhysicalDevice physical_device )
 {
@@ -290,6 +396,7 @@ QueueFamilyIndicies vulkan_renderer::get_queue_family( VkPhysicalDevice physical
 	return indicies;
 }
 
+
 SwapChainDetails vulkan_renderer::get_swap_chain_details(VkPhysicalDevice physical_device)
 {
 	SwapChainDetails swap_chain_details;
@@ -320,4 +427,101 @@ SwapChainDetails vulkan_renderer::get_swap_chain_details(VkPhysicalDevice physic
 	}
 
 	return swap_chain_details;
+}
+
+
+// We select
+// format		: R8G8B8A8 UNORM
+// colorspace	: SRGB
+VkSurfaceFormatKHR vulkan_renderer::choose_best_surface_format(std::vector<VkSurfaceFormatKHR> formats)
+{
+	//VK_FORMAT_B8G8R8A8_UNORM
+	//VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+	
+	if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+	{
+		return { VK_FORMAT_R8G8B8A8_UNORM , VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	}
+
+	for (auto const &format: formats )
+	{
+		if ((format.format == VK_FORMAT_B8G8R8A8_UNORM || format.format == VK_FORMAT_B8G8R8A8_UNORM)
+			&& format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			return format;
+		}
+	}
+
+	return formats[0];
+}
+
+
+VkPresentModeKHR vulkan_renderer::choose_best_present_mode(std::vector<VkPresentModeKHR> modes)
+{
+	for (auto const& presentation_mode : modes)
+	{
+		if (presentation_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+		{
+			return presentation_mode;
+		}
+	}
+
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+
+VkExtent2D vulkan_renderer::choose_swap_extent(const VkSurfaceCapabilitiesKHR surface_capabilities)
+{
+	if (surface_capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+	{
+		return surface_capabilities.currentExtent;
+	}
+	else
+	{
+		int width, height;
+		glfwGetFramebufferSize(window, &width, &height);
+
+		VkExtent2D new_extent = {};
+		new_extent.width = static_cast<uint32_t>(width);
+		new_extent.height = static_cast<uint32_t>(height);
+
+		new_extent.width = std::max(surface_capabilities.minImageExtent.width, std::min(surface_capabilities.maxImageExtent.width, new_extent.width));
+		new_extent.height = std::max(surface_capabilities.minImageExtent.height, std::min(surface_capabilities.maxImageExtent.height, new_extent.height));
+	
+		return new_extent;
+	}
+}
+
+
+VkImageView vulkan_renderer::create_image_view(VkImage image, VkFormat format, VkImageAspectFlags flags)
+{
+	VkImageViewCreateInfo imageview_create_info = {};
+	imageview_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imageview_create_info.image = image;
+	imageview_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imageview_create_info.format = format;
+	imageview_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageview_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageview_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imageview_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+	imageview_create_info.subresourceRange.aspectMask = flags;
+	imageview_create_info.subresourceRange.baseMipLevel = 0;
+	imageview_create_info.subresourceRange.levelCount = 1;
+	imageview_create_info.subresourceRange.baseArrayLayer = 0;
+	imageview_create_info.subresourceRange.layerCount = 0;
+
+	VkImageView image_view;
+	VkResult result = vkCreateImageView(main_device.logical_device, &imageview_create_info, nullptr, &image_view);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to create a Image view");
+	}
+	else
+	{
+		printf("Image view creation is  a success \n");
+	}
+
+	return image_view;
 }

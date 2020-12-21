@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 #include <set>
+#include <algorithm>
 
 #include "utilities.h"
 
@@ -22,11 +23,18 @@ class vulkan_renderer {
 	VkQueue graphics_queue;
 	VkQueue presentation_queue;
 	VkSurfaceKHR surface;
+	VkSwapchainKHR swap_chain;
+
+	VkFormat swap_chain_image_format;
+	VkExtent2D swap_chain_extent;
+
+	std::vector<SwapChainImage> swap_chain_images;
 
 	// Create the vulkan instance
 	void create_instance();
 	void create_logical_device();
 	void create_surface();
+	void create_swap_chain();
 
 	// Get functions
 	void get_physical_device();
@@ -39,6 +47,13 @@ class vulkan_renderer {
 	// Getter
 	QueueFamilyIndicies get_queue_family(VkPhysicalDevice physical_device);
 	SwapChainDetails get_swap_chain_details(VkPhysicalDevice physical_device);
+
+	// Choose
+	VkSurfaceFormatKHR choose_best_surface_format( std::vector<VkSurfaceFormatKHR> formats );
+	VkPresentModeKHR choose_best_present_mode( std::vector<VkPresentModeKHR> modes );
+	VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR surface_capabilities );
+
+	VkImageView create_image_view(VkImage image, VkFormat format, VkImageAspectFlags flags);
 
 public:
 	vulkan_renderer();
