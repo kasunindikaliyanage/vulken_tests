@@ -30,11 +30,15 @@ class vulkan_renderer {
 
 	std::vector<SwapChainImage> swap_chain_images;
 
+	VkPipelineLayout pipeline_layout;
+
 	// Create the vulkan instance
 	void create_instance();
 	void create_logical_device();
 	void create_surface();
 	void create_swap_chain();
+	void create_graphic_pipeline();
+	void create_renderpass();
 
 	// Get functions
 	void get_physical_device();
@@ -53,7 +57,8 @@ class vulkan_renderer {
 	VkPresentModeKHR choose_best_present_mode( std::vector<VkPresentModeKHR> modes );
 	VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR surface_capabilities );
 
-	VkImageView create_image_view(VkImage image, VkFormat format, VkImageAspectFlags flags);
+	VkImageView create_image_view( VkImage image, VkFormat format, VkImageAspectFlags flags );
+	VkShaderModule create_shader_module( const std::vector<char> code );
 
 public:
 	vulkan_renderer();
