@@ -7,6 +7,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <array>
 
 #include "utilities.h"
 
@@ -31,6 +32,8 @@ class vulkan_renderer {
 	std::vector<SwapChainImage> swap_chain_images;
 
 	VkPipelineLayout pipeline_layout;
+	VkRenderPass render_pass;
+	VkPipeline graphics_pipeline = {};
 
 	// Create the vulkan instance
 	void create_instance();

@@ -31,7 +31,11 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 
 void vulkan_renderer::cleanup()
 {
+	vkDestroyPipeline(main_device.logical_device, graphics_pipeline, nullptr);
+
 	vkDestroyPipelineLayout(main_device.logical_device, pipeline_layout, nullptr);
+
+	vkDestroyRenderPass(main_device.logical_device, render_pass, nullptr);
 
 	for (auto image: swap_chain_images)
 	{
@@ -251,6 +255,73 @@ void vulkan_renderer::create_swap_chain()
 }
 
 
+void vulkan_renderer::create_renderpass()
+{
+	//Color attachment of the renderpass
+	VkAttachmentDescription color_attachment = {};
+	color_attachment.format = swap_chain_image_format;
+	color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference color_attachment_reference = {};
+	color_attachment_reference.attachment = 0;
+	color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	//Subpass
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &color_attachment_reference;
+
+	//layout transition using subpass dependencies
+	std::array<VkSubpassDependency, 2> subpass_dependencies;
+
+	subpass_dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	subpass_dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	subpass_dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+
+	subpass_dependencies[0].dstSubpass = 0;
+	subpass_dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpass_dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	subpass_dependencies[0].dependencyFlags = 0;
+
+	subpass_dependencies[1].srcSubpass = 0;
+	subpass_dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	subpass_dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	subpass_dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	subpass_dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	subpass_dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	subpass_dependencies[1].dependencyFlags = 0;
+
+	VkRenderPassCreateInfo renderpass_create_info = {};
+	renderpass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderpass_create_info.attachmentCount = 1;
+	renderpass_create_info.pAttachments = &color_attachment;
+	renderpass_create_info.subpassCount = 1;
+	renderpass_create_info.pSubpasses = &subpass;
+	renderpass_create_info.dependencyCount = static_cast<uint32_t>(subpass_dependencies.size());
+	renderpass_create_info.pDependencies = subpass_dependencies.data();
+
+	VkResult result = vkCreateRenderPass(main_device.logical_device, &renderpass_create_info, nullptr, &render_pass);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(" Error: Failed to create the RenderPass \n");
+	}
+	else
+	{
+		printf("RenderPass creation is  a success \n");
+	}
+}
+
+
 void vulkan_renderer::create_graphic_pipeline()
 {
 	auto vertex_shader_code = read_shader_file("../shaders/vert.spv");
@@ -372,15 +443,40 @@ void vulkan_renderer::create_graphic_pipeline()
 	}
 
 	// PIPELINE - Deapth/Stencil configuration. TODO
+	VkGraphicsPipelineCreateInfo pipeline_create_info = {};
+	pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_create_info.stageCount = 2;
+	pipeline_create_info.pStages = shader_stage_info;
+	pipeline_create_info.pVertexInputState = &vertex_input_state_info;
+	pipeline_create_info.pInputAssemblyState = &input_assembly_info;
+	pipeline_create_info.pViewportState = &viewport_create_info;
+	pipeline_create_info.pDynamicState = nullptr;
+	pipeline_create_info.pRasterizationState = &rasterizer_create_info;
+	pipeline_create_info.pMultisampleState = &multisampling_create_info;
+	pipeline_create_info.pColorBlendState = &color_blend_state_create_info;
+	pipeline_create_info.pDepthStencilState = nullptr;
+	pipeline_create_info.layout = pipeline_layout;
+	pipeline_create_info.renderPass = render_pass;
+	pipeline_create_info.subpass = 0;
+
+	// Piepeline derivatives
+	pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
+	pipeline_create_info.basePipelineIndex = 0;
+
+	result = vkCreateGraphicsPipelines(main_device.logical_device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &graphics_pipeline);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(" Error: Failed to create a Graphics pipeline\n");
+	}
+	else
+	{
+		printf("Graphics pipeline creation is  a success \n");
+	}
 
 	// Destroy shader modules
 	vkDestroyShaderModule(main_device.logical_device, fragment_shader_module, nullptr);
 	vkDestroyShaderModule(main_device.logical_device, vertex_shader_module, nullptr);
-}
-
-void vulkan_renderer::create_renderpass()
-{
-
 }
 
 
