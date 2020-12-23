@@ -22,6 +22,7 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 		create_command_pool();
 		create_commandbuffer();
 		record_commands();
+		create_synchronization();
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -33,8 +34,67 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 }
 
 
+void vulkan_renderer::draw()
+{
+	//Get the next image
+	uint32_t image_index;
+	vkAcquireNextImageKHR(main_device.logical_device, swap_chain, std::numeric_limits<uint32_t>::max(), image_available, VK_NULL_HANDLE, &image_index);
+
+	// submit command buffer to render
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.waitSemaphoreCount = 1;
+	submit_info.pWaitSemaphores = &image_available;
+	
+	VkPipelineStageFlags wait_stages[] = {
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+	};
+	
+	submit_info.pWaitDstStageMask = wait_stages;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &commandbuffers[image_index];
+	submit_info.signalSemaphoreCount = 1;
+	submit_info.pSignalSemaphores = &render_finished;
+
+	VkResult result = vkQueueSubmit( graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to submit the commands to the queue \n");
+	}
+	else
+	{
+		printf("Submit to queue for drawing is success \n");
+	}
+
+
+	VkPresentInfoKHR present_info = {};
+	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	present_info.waitSemaphoreCount = 1;
+	present_info.pWaitSemaphores = &render_finished;
+	present_info.swapchainCount = 1;
+	present_info.pSwapchains = &swap_chain;
+	present_info.pImageIndices = &image_index;
+
+	result = vkQueuePresentKHR(graphics_queue, &present_info);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to present image \n");
+	}
+	else
+	{
+		printf("Presenting image is success \n");
+	}
+
+}
+
+
 void vulkan_renderer::cleanup()
 {
+	vkDestroySemaphore(main_device.logical_device, render_finished, nullptr);
+	vkDestroySemaphore(main_device.logical_device, image_available, nullptr);
+
 	vkDestroyCommandPool(main_device.logical_device, graphics_cmd_pool, nullptr);
 
 	for (auto framebuffer : swapchain_framebuffers)
@@ -409,6 +469,19 @@ void vulkan_renderer::create_commandbuffer()
 	else
 	{
 		printf("Command buffer allocation is  a success \n");
+	}
+}
+
+
+void vulkan_renderer::create_synchronization()
+{
+	VkSemaphoreCreateInfo semaphore_ci = {};
+	semaphore_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	if ((vkCreateSemaphore(main_device.logical_device, &semaphore_ci, nullptr, &image_available) != VK_SUCCESS)
+		|| (vkCreateSemaphore(main_device.logical_device, &semaphore_ci, nullptr, &render_finished) != VK_SUCCESS))
+	{
+		throw std::runtime_error(" Error: Failed to create Semaphore \n");
 	}
 }
 

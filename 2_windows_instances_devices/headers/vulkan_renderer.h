@@ -39,6 +39,9 @@ class vulkan_renderer {
 	VkRenderPass render_pass;
 	VkPipeline graphics_pipeline = {};
 
+	VkSemaphore image_available;
+	VkSemaphore render_finished;
+
 	// Create the vulkan instance
 	void create_instance();
 	void create_logical_device();
@@ -49,6 +52,7 @@ class vulkan_renderer {
 	void create_framebuffers();
 	void create_command_pool();
 	void create_commandbuffer();
+	void create_synchronization();
 
 	// Record function
 	void record_commands();
@@ -77,6 +81,6 @@ public:
 	vulkan_renderer();
 
 	int init(GLFWwindow* new_window);
-
+	void draw();
 	void cleanup();
 };
