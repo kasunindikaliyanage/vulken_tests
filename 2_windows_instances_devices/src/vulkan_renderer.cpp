@@ -18,6 +18,10 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 		create_swap_chain();
 		create_renderpass();
 		create_graphic_pipeline();
+		create_framebuffers();
+		create_command_pool();
+		create_commandbuffer();
+		record_commands();
 	}
 	catch (const std::runtime_error &e)
 	{
@@ -31,6 +35,13 @@ int vulkan_renderer::init(GLFWwindow* new_window)
 
 void vulkan_renderer::cleanup()
 {
+	vkDestroyCommandPool(main_device.logical_device, graphics_cmd_pool, nullptr);
+
+	for (auto framebuffer : swapchain_framebuffers)
+	{
+		vkDestroyFramebuffer(main_device.logical_device, framebuffer, nullptr);
+	}
+
 	vkDestroyPipeline(main_device.logical_device, graphics_pipeline, nullptr);
 
 	vkDestroyPipelineLayout(main_device.logical_device, pipeline_layout, nullptr);
@@ -318,6 +329,144 @@ void vulkan_renderer::create_renderpass()
 	else
 	{
 		printf("RenderPass creation is  a success \n");
+	}
+}
+
+
+void vulkan_renderer::create_framebuffers()
+{
+	//There will be one framebuffer for each image in swapchain
+	swapchain_framebuffers.resize(swap_chain_images.size());
+
+	for (size_t i = 0; i < swapchain_framebuffers.size(); i++)
+	{
+		std::array<VkImageView, 1> attachments = {
+			swap_chain_images[i].image_view
+		};
+
+		VkFramebufferCreateInfo framebuffer_create_info = {};
+		framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebuffer_create_info.renderPass = render_pass;
+		framebuffer_create_info.attachmentCount = static_cast<uint32_t>(attachments.size());
+		framebuffer_create_info.pAttachments = attachments.data();
+		framebuffer_create_info.width = swap_chain_extent.width;
+		framebuffer_create_info.height = swap_chain_extent.height;
+		framebuffer_create_info.layers = 1;
+
+		VkResult result = vkCreateFramebuffer(main_device.logical_device, &framebuffer_create_info, nullptr, &swapchain_framebuffers[i]);
+
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error(" Error: Failed to create the framebuffer \n");
+		}
+		else
+		{
+			printf("Framebuffer creation is  a success \n");
+		}
+	}
+
+}
+
+
+void vulkan_renderer::create_command_pool()
+{
+	QueueFamilyIndicies queue_family_indicies = get_queue_family(main_device.physical_device);
+
+	VkCommandPoolCreateInfo cmd_pool_create_info = {};
+	cmd_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmd_pool_create_info.queueFamilyIndex = queue_family_indicies.graphics_family;
+
+	VkResult result = vkCreateCommandPool(main_device.logical_device, &cmd_pool_create_info, nullptr, &graphics_cmd_pool);
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(" Error: Failed to create the Command pool \n");
+	}
+	else
+	{
+		printf("Command pool creation is  a success \n");
+	}
+
+}
+
+
+void vulkan_renderer::create_commandbuffer()
+{
+	commandbuffers.resize(swapchain_framebuffers.size());
+
+	VkCommandBufferAllocateInfo cb_alloc_info = {};
+	cb_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	cb_alloc_info.commandPool = graphics_cmd_pool;
+	cb_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	cb_alloc_info.commandBufferCount = static_cast<uint32_t>(commandbuffers.size());
+
+	VkResult result=  vkAllocateCommandBuffers(main_device.logical_device, &cb_alloc_info, commandbuffers.data());
+
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error(" Error: Failed to allocate command buffer \n");
+	}
+	else
+	{
+		printf("Command buffer allocation is  a success \n");
+	}
+}
+
+
+void vulkan_renderer::record_commands()
+{
+	VkCommandBufferBeginInfo cb_begin_info = {};
+	cb_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	cb_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+	VkRenderPassBeginInfo rp_begin_info = {};
+	rp_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rp_begin_info.renderPass = render_pass;
+	rp_begin_info.renderArea.offset = { 0,0 };	//start point of render pass
+	rp_begin_info.renderArea.extent = swap_chain_extent;
+	
+	VkClearValue clear_value[] = {
+		{ 0.6f, 0.65f, 0.4f, 1.0f }
+	};
+
+	rp_begin_info.pClearValues = clear_value;
+	rp_begin_info.clearValueCount = 1;
+
+	for (size_t i = 0; i < commandbuffers.size(); i++)
+	{
+		rp_begin_info.framebuffer = swapchain_framebuffers[i];
+
+		VkResult result = vkBeginCommandBuffer(commandbuffers[i], &cb_begin_info);
+
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error(" Error: Failed record command buffer \n");
+		}
+		else
+		{
+			printf("Command buffer Recording is  a success \n");
+		}
+
+		//render pass
+		vkCmdBeginRenderPass(commandbuffers[i], &rp_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+		
+		{
+			vkCmdBindPipeline(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+			vkCmdDraw(commandbuffers[i], 3, 1, 0, 0);
+		}
+		
+		vkCmdEndRenderPass(commandbuffers[i]);
+
+		result = vkEndCommandBuffer(commandbuffers[i]);
+
+		if (result != VK_SUCCESS)
+		{
+			throw std::runtime_error(" Error: Failed Stop record command buffer \n");
+		}
+		else
+		{
+			printf("Command buffer Recording Stopping is  a success \n");
+		}
 	}
 }
 

@@ -29,7 +29,11 @@ class vulkan_renderer {
 	VkFormat swap_chain_image_format;
 	VkExtent2D swap_chain_extent;
 
+	VkCommandPool graphics_cmd_pool;
+
 	std::vector<SwapChainImage> swap_chain_images;
+	std::vector<VkFramebuffer> swapchain_framebuffers;
+	std::vector<VkCommandBuffer> commandbuffers;
 
 	VkPipelineLayout pipeline_layout;
 	VkRenderPass render_pass;
@@ -42,6 +46,12 @@ class vulkan_renderer {
 	void create_swap_chain();
 	void create_graphic_pipeline();
 	void create_renderpass();
+	void create_framebuffers();
+	void create_command_pool();
+	void create_commandbuffer();
+
+	// Record function
+	void record_commands();
 
 	// Get functions
 	void get_physical_device();
