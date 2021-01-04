@@ -92,6 +92,8 @@ void vulkan_renderer::draw()
 
 void vulkan_renderer::cleanup()
 {
+	vkDeviceWaitIdle(main_device.logical_device);
+
 	vkDestroySemaphore(main_device.logical_device, render_finished, nullptr);
 	vkDestroySemaphore(main_device.logical_device, image_available, nullptr);
 
@@ -631,7 +633,7 @@ void vulkan_renderer::create_graphic_pipeline()
 		| VK_COLOR_COMPONENT_A_BIT;
 	blend_attach_state.blendEnable = VK_TRUE;
 
-	blend_attach_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC1_ALPHA;
+	blend_attach_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
 	blend_attach_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
 	blend_attach_state.colorBlendOp = VK_BLEND_OP_ADD;
 
